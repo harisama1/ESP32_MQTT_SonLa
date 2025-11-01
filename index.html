@@ -1,0 +1,96 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>ESP32 MQTT Control (Public)</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <style>
+    body { font-family: Arial, sans-serif; text-align:center; margin:20px; max-width:900px; }
+    .led { display:inline-block; width:140px; margin:10px; border:1px solid #ddd; border-radius:10px; padding:10px; }
+    .bulb { width:44px; height:44px; border-radius:50%; margin:10px auto; background:#ccc; }
+    .on { background:limegreen !important; }
+    button { padding:8px 12px; margin-top:6px; }
+    .btnstate { font-weight:bold; margin-left:6px; }
+  </style>
+</head>
+<body>
+  <h1>ESP32 MQTT Control</h1>
+  <p>Broker: <b>HiveMQ Public</b></p>
+
+  <div id="leds"></div>
+  <h3>Buttons</h3>
+  <div id="buttons"></div>
+
+  <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
+  <script>
+    // ---- CẤU HÌNH (Thay đổi nếu cần) ----
+    const brokerUrl = "wss://broker.hivemq.com:8884/mqtt"; // HiveMQ public (wss)
+    const prefix = "Tap_huan_Son_La"; // <-- đổi thành prefix riêng của bạn để tránh xung đột
+
+    // ---- KHÔI TẠO GIAO DIỆN ----
+    const ledsDiv = document.getElementById('leds');
+    for (let i=1;i<=4;i++){
+      const el = document.createElement('div');
+      el.className = 'led';
+      el.innerHTML = `
+        <h4>LED ${i}</h4>
+        <div class="bulb" id="bulb${i}"></div>
+        <div><button onclick="toggleLED(${i})">Toggle</button>
+        <span class="btnstate" id="state${i}">?</span></div>
+      `;
+      ledsDiv.appendChild(el);
+    }
+
+    const buttonsDiv = document.getElementById('buttons');
+    for (let i=1;i<=4;i++){
+      const el = document.createElement('div');
+      el.innerHTML = `Button ${i}: <span id="btn${i}">?</span>`;
+      buttonsDiv.appendChild(el);
+    }
+
+    // ---- KẾT NỐI MQTT ----
+    const client = mqtt.connect(brokerUrl, {
+      clientId: "web_" + Math.random().toString(16).substr(2,8),
+      keepalive: 60,
+      reconnectPeriod: 2000,
+    });
+
+    client.on('connect', () => {
+      console.log("Connected to HiveMQ");
+      for (let i=1;i<=4;i++){
+        client.subscribe(`${prefix}/led/${i}/state`, {qos:0});
+        client.subscribe(`${prefix}/button/${i}/state`, {qos:0});
+      }
+    });
+
+    client.on('message', (topic, message) => {
+      const msg = message.toString();
+      console.log(topic, msg);
+      const ledMatch = topic.match(new RegExp(`${prefix}/led/(\\d+)/state`));
+      const btnMatch = topic.match(new RegExp(`${prefix}/button/(\\d+)/state`));
+
+      if (ledMatch){
+        const id = ledMatch[1];
+        const bulb = document.getElementById('bulb' + id);
+        const stateEl = document.getElementById('state' + id);
+        const isOn = msg.toUpperCase().includes('ON') || msg === '1' || msg === 'true';
+        bulb.classList.toggle('on', isOn);
+        stateEl.textContent = isOn ? 'ON' : 'OFF';
+      } else if (btnMatch){
+        const id = btnMatch[1];
+        document.getElementById('btn' + id).textContent = msg;
+      }
+    });
+
+    client.on('error', (err) => console.error('MQTT Error', err));
+    client.on('reconnect', () => console.log('MQTT reconnecting...'));
+
+    // ---- HÀM điều khiển ----
+    function toggleLED(i){
+      const bulb = document.getElementById('bulb' + i);
+      const newState = bulb.classList.contains('on') ? 'OFF' : 'ON';
+      client.publish(`${prefix}/led/${i}/set`, newState);
+    }
+  </script>
+</body>
+</html>
