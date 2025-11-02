@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Điều khiển LED ESP32 qua MQTT</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background: #f8f9fa;
+      text-align: center;
+      margin-top: 50px;
+    }
+    h1 {
+      color: #333;
+    }
+    .led-container {
+      display: flex;
+      justify-content: center;
+      gap: 30px;
+      flex-wrap: wrap;
+      margin: 30px 0;
+    }
+    .led {
+      width: 100px;
+      height: 100px;
+      border-radius: 50%;
+      background: gray;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: white;
+      font-weight: bold;
+      cursor: pointer;
+      box-shadow: 0 0 10px rgba(0,0,0,0.2);
+      transition: all 0.3s;
+    }
+    .on {
+      background: limegreen;
+    }
+    .off {
+      background: gray;
+    }
+    #buttons {
+      margin-top: 40px;
+    }
+  </style>
+</head>
+<body>
+  <h1>Điều khiển LED ESP32 qua MQTT</h1>
+
+  <div class="led-container">
+    <div id="led1" class="led off" onclick="toggleLED(1)">LED 1</div>
+    <div id="led2" class="led off" onclick="toggleLED(2)">LED 2</div>
+    <div id="led3" class="led off" onclick="toggleLED(3)">LED 3</div>
+    <div id="led4" class="led off" onclick="toggleLED(4)">LED 4</div>
+  </div>
+
+  <h2>Trạng thái nút bấm</h2>
+  <div id="buttons">
+    <p>Nút 1: <span id="btn1">Chưa nhấn</span></p>
+    <p>Nút 2: <span id="btn2">Chưa nhấn</span></p>
+  </div>
+
+  <script>
+    function toggleLED(num) {
+      const led = document.getElementById("led" + num);
+      const isOn = led.classList.contains("on");
+      led.classList.toggle("on", !isOn);
+      led.classList.toggle("off", isOn);
+
+      console.log("LED " + num + " => " + (isOn ? "OFF" : "ON"));
+      // Sau này ta sẽ publish MQTT message tại đây
+    }
+  </script>
+</body>
+</html>
