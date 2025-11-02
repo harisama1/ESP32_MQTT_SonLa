@@ -103,22 +103,22 @@
     <div class="card">
       <h3>Button 1</h3>
       <div id="button1-indicator" class="btn-indicator"></div>
-      <p id="button1-status">Released</p>
+      <p id="button1-status">OFF</p>
     </div>
     <div class="card">
       <h3>Button 2</h3>
       <div id="button2-indicator" class="btn-indicator"></div>
-      <p id="button2-status">Released</p>
+      <p id="button2-status">OFF</p>
     </div>
     <div class="card">
       <h3>Button 3</h3>
       <div id="button3-indicator" class="btn-indicator"></div>
-      <p id="button3-status">Released</p>
+      <p id="button3-status">OFF</p>
     </div>
     <div class="card">
       <h3>Button 4</h3>
       <div id="button4-indicator" class="btn-indicator"></div>
-      <p id="button4-status">Released</p>
+      <p id="button4-status">OFF</p>
     </div>
   </div>
 
@@ -132,6 +132,9 @@
     };
     const client = mqtt.connect(broker, options);
 
+    // Lưu trạng thái hiện tại của LED
+    const ledState = [0, 0, 0, 0, 0]; // index 1..4
+
     client.on('connect', () => {
       console.log('✅ Connected to HiveMQ broker');
       for (let i = 1; i <= 4; i++) {
@@ -144,39 +147,51 @@
       const msg = message.toString();
       console.log('📩 Received:', topic, msg);
 
-      // Xử lý LED
+      // Xử lý LED state từ ESP32
       if (topic.includes('/led') && topic.includes('/state')) {
         const ledNum = topic.match(/led(\d+)/)[1];
         const status = msg === '1' ? 'ON' : 'OFF';
-        const circle = document.getElementById(`led${ledNum}-circle`);
-        const label = document.getElementById(`led${ledNum}-status`);
-        if (circle && label) {
-          circle.style.backgroundColor = status === 'ON' ? 'limegreen' : 'gray';
-          label.innerText = status;
-        }
+        updateLED(ledNum, status);
       }
 
-      // Xử lý Button
+      // Xử lý Button state từ ESP32
       if (topic.includes('/button')) {
         const btnNum = topic.match(/button(\d+)/)[1];
-        const btnIndicator = document.getElementById(`button${btnNum}-indicator`);
-        const btnLabel = document.getElementById(`button${btnNum}-status`);
-        if (btnIndicator && btnLabel) {
-          if (msg === 'pressed' || msg === '1') {
-            btnIndicator.style.backgroundColor = 'red';
-            btnLabel.innerText = 'Pressed';
-          } else {
-            btnIndicator.style.backgroundColor = '#ccc';
-            btnLabel.innerText = 'Released';
-          }
-        }
+        updateButton(btnNum, msg === 'pressed' || msg === '1' ? 'ON' : 'OFF');
       }
     });
 
     function toggleLED(ledNum) {
+      // Gửi lệnh MQTT
       const topic = `esp32/led${ledNum}`;
       client.publish(topic, 'toggle');
       console.log(`🚀 Sent toggle for LED ${ledNum}`);
+
+      // Đổi trạng thái tại chỗ (UI phản hồi ngay)
+      const newState = ledState[ledNum] ? 0 : 1;
+      ledState[ledNum] = newState;
+      const status = newState ? 'ON' : 'OFF';
+      updateLED(ledNum, status);
+      updateButton(ledNum, status);
+    }
+
+    function updateLED(num, status) {
+      const circle = document.getElementById(`led${num}-circle`);
+      const label = document.getElementById(`led${num}-status`);
+      if (circle && label) {
+        circle.style.backgroundColor = status === 'ON' ? 'limegreen' : 'gray';
+        label.innerText = status;
+        ledState[num] = status === 'ON' ? 1 : 0;
+      }
+    }
+
+    function updateButton(num, status) {
+      const indicator = document.getElementById(`button${num}-indicator`);
+      const label = document.getElementById(`button${num}-status`);
+      if (indicator && label) {
+        indicator.style.backgroundColor = status === 'ON' ? 'red' : '#ccc';
+        label.innerText = status;
+      }
     }
 
     client.on('reconnect', () => console.log('🔁 Reconnecting...'));
