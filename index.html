@@ -4,51 +4,53 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>ESP32 MQTT Control</title>
-
-  <!-- MQTT.js -->
   <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
-
   <style>
     body {
       font-family: Arial, sans-serif;
       text-align: center;
-      background-color: #f7f9fb;
+      background-color: #f8fafc;
       margin: 0;
       padding: 20px;
     }
     h1 {
-      font-size: 2em;
-      margin-bottom: 10px;
+      color: #333;
     }
-    .led-container, .button-container {
+    .container {
       display: flex;
       justify-content: center;
-      gap: 20px;
       flex-wrap: wrap;
+      gap: 25px;
       margin-top: 30px;
     }
     .card {
-      background: white;
-      border-radius: 16px;
-      box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+      background: #fff;
+      border-radius: 14px;
+      box-shadow: 0 3px 8px rgba(0, 0, 0, 0.15);
       width: 180px;
-      padding: 20px;
+      padding: 15px;
+      transition: transform 0.2s ease;
+    }
+    .card:hover {
+      transform: translateY(-3px);
     }
     .circle {
       width: 70px;
       height: 70px;
-      margin: 10px auto;
       border-radius: 50%;
+      margin: 10px auto;
       background-color: gray;
-      transition: background-color 0.3s ease;
+      transition: background-color 0.25s;
     }
     button {
       padding: 6px 12px;
       border: none;
-      background-color: #0078ff;
-      color: white;
       border-radius: 6px;
+      background-color: #007bff;
+      color: white;
       cursor: pointer;
+      font-weight: bold;
+      transition: background-color 0.2s;
     }
     button:hover {
       background-color: #005fcc;
@@ -56,11 +58,11 @@
     .btn-indicator {
       width: 60px;
       height: 60px;
-      margin: 10px auto;
       border-radius: 50%;
+      margin: 10px auto;
       background-color: #ccc;
       border: 2px solid #888;
-      transition: all 0.2s;
+      transition: background-color 0.25s;
     }
   </style>
 </head>
@@ -69,143 +71,132 @@
   <h1>ESP32 MQTT Control</h1>
   <p>Broker: HiveMQ Public</p>
 
-  <!-- LED cards -->
-  <div class="led-container">
+  <!-- LED section -->
+  <div class="container" id="led-container">
     <div class="card">
       <h3>LED 1</h3>
-      <div id="led1-circle" class="circle"></div>
+      <div id="led1" class="circle"></div>
       <button onclick="toggleLED(1)">Toggle</button>
       <p id="led1-status">OFF</p>
     </div>
     <div class="card">
       <h3>LED 2</h3>
-      <div id="led2-circle" class="circle"></div>
+      <div id="led2" class="circle"></div>
       <button onclick="toggleLED(2)">Toggle</button>
       <p id="led2-status">OFF</p>
     </div>
     <div class="card">
       <h3>LED 3</h3>
-      <div id="led3-circle" class="circle"></div>
+      <div id="led3" class="circle"></div>
       <button onclick="toggleLED(3)">Toggle</button>
       <p id="led3-status">OFF</p>
     </div>
     <div class="card">
       <h3>LED 4</h3>
-      <div id="led4-circle" class="circle"></div>
+      <div id="led4" class="circle"></div>
       <button onclick="toggleLED(4)">Toggle</button>
       <p id="led4-status">OFF</p>
     </div>
   </div>
 
-  <!-- Button cards -->
+  <!-- Button section -->
   <h2 style="margin-top:40px;">Button Status</h2>
-  <div class="button-container">
+  <div class="container">
     <div class="card">
       <h3>Button 1</h3>
-      <div id="button1-indicator" class="btn-indicator"></div>
+      <div id="button1" class="btn-indicator"></div>
       <p id="button1-status">OFF</p>
     </div>
     <div class="card">
       <h3>Button 2</h3>
-      <div id="button2-indicator" class="btn-indicator"></div>
+      <div id="button2" class="btn-indicator"></div>
       <p id="button2-status">OFF</p>
     </div>
     <div class="card">
       <h3>Button 3</h3>
-      <div id="button3-indicator" class="btn-indicator"></div>
+      <div id="button3" class="btn-indicator"></div>
       <p id="button3-status">OFF</p>
     </div>
     <div class="card">
       <h3>Button 4</h3>
-      <div id="button4-indicator" class="btn-indicator"></div>
+      <div id="button4" class="btn-indicator"></div>
       <p id="button4-status">OFF</p>
     </div>
   </div>
 
-  <!-- MQTT JavaScript -->
   <script>
-    // MQTT broker cấu hình
+    // --- MQTT Config ---
     const broker = 'wss://broker.hivemq.com:8884/mqtt';
-    const options = {
-      clean: true,
-      connectTimeout: 4000,
-      clientId: 'esp32-web-' + Math.random().toString(16).substr(2, 8),
-    };
+    const clientId = 'webclient-' + Math.random().toString(16).substr(2, 8);
+    const options = { clean: true, connectTimeout: 4000, clientId };
 
-    // Kết nối MQTT
     const client = mqtt.connect(broker, options);
 
-    // Mảng lưu trạng thái LED hiện tại
-    const ledState = [0, 0, 0, 0, 0]; // index từ 1..4
+    const ledState = [0, 0, 0, 0, 0]; // 1-indexed array
 
     client.on('connect', () => {
-      console.log('✅ Connected to HiveMQ broker');
+      console.log('✅ Connected to HiveMQ');
       for (let i = 1; i <= 4; i++) {
         client.subscribe(`esp32/led${i}/state`);
         client.subscribe(`esp32/button${i}`);
       }
     });
 
-    // Nhận dữ liệu từ MQTT
     client.on('message', (topic, message) => {
       const msg = message.toString();
-      console.log('📩 Received:', topic, msg);
+      console.log('📩', topic, msg);
 
-      // Nếu là trạng thái LED
+      // LED state update
       if (topic.includes('/led') && topic.includes('/state')) {
-        const ledNum = topic.match(/led(\d+)/)[1];
-        const status = msg === '1' ? 'ON' : 'OFF';
-        updateLED(ledNum, status);
-        updateButton(ledNum, status); // 🔗 Đồng bộ nút
+        const ledNum = parseInt(topic.match(/led(\d+)/)[1]);
+        const state = msg === '1' ? 'ON' : 'OFF';
+        updateLED(ledNum, state);
+        updateButton(ledNum, state); // sync
       }
 
-      // Nếu là trạng thái nút từ ESP32
+      // Button pressed update
       if (topic.includes('/button')) {
-        const btnNum = topic.match(/button(\d+)/)[1];
-        const status = msg === '1' ? 'ON' : 'OFF';
-        updateButton(btnNum, status);
-        updateLED(btnNum, status); // 🔗 Đồng bộ LED
+        const btnNum = parseInt(topic.match(/button(\d+)/)[1]);
+        const state = msg === '1' ? 'ON' : 'OFF';
+        updateButton(btnNum, state);
+        updateLED(btnNum, state); // sync LED with button
       }
     });
 
-    // Gửi lệnh toggle từ web
-    function toggleLED(ledNum) {
-      const topic = `esp32/led${ledNum}`;
+    // Toggle LED (send message)
+    function toggleLED(num) {
+      const topic = `esp32/led${num}`;
       client.publish(topic, 'toggle');
-      console.log(`🚀 Sent toggle for LED ${ledNum}`);
+      console.log('🚀 Toggle LED', num);
 
-      // Đổi trạng thái tạm thời trên giao diện
-      const newState = ledState[ledNum] ? 0 : 1;
-      const status = newState ? 'ON' : 'OFF';
-      ledState[ledNum] = newState;
-
-      updateLED(ledNum, status);
-      updateButton(ledNum, status);
+      // Tạm thời thay đổi giao diện (nếu ESP32 phản hồi trễ)
+      const nextState = ledState[num] ? 'OFF' : 'ON';
+      updateLED(num, nextState);
+      updateButton(num, nextState);
     }
 
-    // Cập nhật LED hiển thị
-    function updateLED(num, status) {
-      const circle = document.getElementById(`led${num}-circle`);
+    // --- UI Update Functions ---
+    function updateLED(num, state) {
+      const led = document.getElementById(`led${num}`);
       const label = document.getElementById(`led${num}-status`);
-      if (circle && label) {
-        circle.style.backgroundColor = status === 'ON' ? 'limegreen' : 'gray';
-        label.innerText = status;
-        ledState[num] = status === 'ON' ? 1 : 0;
+      if (led && label) {
+        led.style.backgroundColor = state === 'ON' ? 'limegreen' : 'gray';
+        label.textContent = state;
+        ledState[num] = state === 'ON' ? 1 : 0;
       }
     }
 
-    // Cập nhật nút hiển thị
-    function updateButton(num, status) {
-      const indicator = document.getElementById(`button${num}-indicator`);
+    function updateButton(num, state) {
+      const btn = document.getElementById(`button${num}`);
       const label = document.getElementById(`button${num}-status`);
-      if (indicator && label) {
-        indicator.style.backgroundColor = status === 'ON' ? 'red' : '#ccc';
-        label.innerText = status;
+      if (btn && label) {
+        btn.style.backgroundColor = state === 'ON' ? 'red' : '#ccc';
+        label.textContent = state;
       }
     }
 
     client.on('reconnect', () => console.log('🔁 Reconnecting...'));
-    client.on('close', () => console.log('❌ Disconnected from broker'));
+    client.on('close', () => console.log('❌ Disconnected'));
   </script>
 </body>
 </html>
