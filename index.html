@@ -20,7 +20,7 @@
       font-size: 2em;
       margin-bottom: 10px;
     }
-    .led-container {
+    .led-container, .button-container {
       display: flex;
       justify-content: center;
       gap: 20px;
@@ -53,8 +53,14 @@
     button:hover {
       background-color: #005fcc;
     }
-    #buttons-status {
-      margin-top: 30px;
+    .btn-indicator {
+      width: 60px;
+      height: 60px;
+      margin: 10px auto;
+      border-radius: 50%;
+      background-color: #ccc;
+      border: 2px solid #888;
+      transition: all 0.2s;
     }
   </style>
 </head>
@@ -63,6 +69,7 @@
   <h1>ESP32 MQTT Control</h1>
   <p>Broker: HiveMQ Public</p>
 
+  <!-- LED cards -->
   <div class="led-container">
     <div class="card">
       <h3>LED 1</h3>
@@ -70,21 +77,18 @@
       <button onclick="toggleLED(1)">Toggle</button>
       <p id="led1-status">OFF</p>
     </div>
-
     <div class="card">
       <h3>LED 2</h3>
       <div id="led2-circle" class="circle"></div>
       <button onclick="toggleLED(2)">Toggle</button>
       <p id="led2-status">OFF</p>
     </div>
-
     <div class="card">
       <h3>LED 3</h3>
       <div id="led3-circle" class="circle"></div>
       <button onclick="toggleLED(3)">Toggle</button>
       <p id="led3-status">OFF</p>
     </div>
-
     <div class="card">
       <h3>LED 4</h3>
       <div id="led4-circle" class="circle"></div>
@@ -93,12 +97,29 @@
     </div>
   </div>
 
-  <div id="buttons-status">
-    <h2>Buttons</h2>
-    <p>Button 1: <span id="button1-status">?</span></p>
-    <p>Button 2: <span id="button2-status">?</span></p>
-    <p>Button 3: <span id="button3-status">?</span></p>
-    <p>Button 4: <span id="button4-status">?</span></p>
+  <!-- Button cards -->
+  <h2 style="margin-top:40px;">Button Status</h2>
+  <div class="button-container">
+    <div class="card">
+      <h3>Button 1</h3>
+      <div id="button1-indicator" class="btn-indicator"></div>
+      <p id="button1-status">Released</p>
+    </div>
+    <div class="card">
+      <h3>Button 2</h3>
+      <div id="button2-indicator" class="btn-indicator"></div>
+      <p id="button2-status">Released</p>
+    </div>
+    <div class="card">
+      <h3>Button 3</h3>
+      <div id="button3-indicator" class="btn-indicator"></div>
+      <p id="button3-status">Released</p>
+    </div>
+    <div class="card">
+      <h3>Button 4</h3>
+      <div id="button4-indicator" class="btn-indicator"></div>
+      <p id="button4-status">Released</p>
+    </div>
   </div>
 
   <!-- MQTT JavaScript -->
@@ -123,6 +144,7 @@
       const msg = message.toString();
       console.log('📩 Received:', topic, msg);
 
+      // Xử lý LED
       if (topic.includes('/led') && topic.includes('/state')) {
         const ledNum = topic.match(/led(\d+)/)[1];
         const status = msg === '1' ? 'ON' : 'OFF';
@@ -134,11 +156,19 @@
         }
       }
 
+      // Xử lý Button
       if (topic.includes('/button')) {
         const btnNum = topic.match(/button(\d+)/)[1];
+        const btnIndicator = document.getElementById(`button${btnNum}-indicator`);
         const btnLabel = document.getElementById(`button${btnNum}-status`);
-        if (btnLabel) {
-          btnLabel.innerText = msg;
+        if (btnIndicator && btnLabel) {
+          if (msg === 'pressed' || msg === '1') {
+            btnIndicator.style.backgroundColor = 'red';
+            btnLabel.innerText = 'Pressed';
+          } else {
+            btnIndicator.style.backgroundColor = '#ccc';
+            btnLabel.innerText = 'Released';
+          }
         }
       }
     });
@@ -146,7 +176,7 @@
     function toggleLED(ledNum) {
       const topic = `esp32/led${ledNum}`;
       client.publish(topic, 'toggle');
-      console.log(`🚀 Sent toggle command for LED ${ledNum}`);
+      console.log(`🚀 Sent toggle for LED ${ledNum}`);
     }
 
     client.on('reconnect', () => console.log('🔁 Reconnecting...'));
