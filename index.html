@@ -1,72 +1,156 @@
-<script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
-<script>
-// =======================
-//  MQTT Connection Setup
-// =======================
-const broker = 'wss://broker.hivemq.com:8884/mqtt';
-const options = {
-  clean: true,
-  connectTimeout: 4000,
-  clientId: 'esp32-web-' + Math.random().toString(16).substr(2, 8),
-};
-const client = mqtt.connect(broker, options);
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ESP32 MQTT Control</title>
 
-client.on('connect', () => {
-  console.log('✅ Connected to HiveMQ broker');
+  <!-- MQTT.js -->
+  <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
 
-  // Subscribe topics for LED states and buttons
-  for (let i = 1; i <= 4; i++) {
-    client.subscribe(`esp32/led${i}/state`);
-    client.subscribe(`esp32/button${i}`);
-  }
-});
-
-client.on('error', (err) => {
-  console.error('❌ Connection error: ', err);
-});
-
-// =======================
-//  Handle incoming MQTT messages
-// =======================
-client.on('message', (topic, message) => {
-  const msg = message.toString();
-  console.log('📩 Received:', topic, msg);
-
-  // Update LED state
-  if (topic.includes('/led') && topic.includes('/state')) {
-    const ledNum = topic.match(/led(\d+)/)[1];
-    const status = msg === '1' ? 'ON' : 'OFF';
-    const circle = document.getElementById(`led${ledNum}-circle`);
-    const label = document.getElementById(`led${ledNum}-status`);
-
-    if (circle && label) {
-      circle.style.backgroundColor = status === 'ON' ? 'limegreen' : 'gray';
-      label.innerText = status;
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      text-align: center;
+      background-color: #f7f9fb;
+      margin: 0;
+      padding: 20px;
     }
-  }
-
-  // Update button states
-  if (topic.includes('/button')) {
-    const btnNum = topic.match(/button(\d+)/)[1];
-    const btnLabel = document.getElementById(`button${btnNum}-status`);
-    if (btnLabel) {
-      btnLabel.innerText = msg;
+    h1 {
+      font-size: 2em;
+      margin-bottom: 10px;
     }
-  }
-});
+    .led-container {
+      display: flex;
+      justify-content: center;
+      gap: 20px;
+      flex-wrap: wrap;
+      margin-top: 30px;
+    }
+    .card {
+      background: white;
+      border-radius: 16px;
+      box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+      width: 180px;
+      padding: 20px;
+    }
+    .circle {
+      width: 70px;
+      height: 70px;
+      margin: 10px auto;
+      border-radius: 50%;
+      background-color: gray;
+      transition: background-color 0.3s ease;
+    }
+    button {
+      padding: 6px 12px;
+      border: none;
+      background-color: #0078ff;
+      color: white;
+      border-radius: 6px;
+      cursor: pointer;
+    }
+    button:hover {
+      background-color: #005fcc;
+    }
+    #buttons-status {
+      margin-top: 30px;
+    }
+  </style>
+</head>
 
-// =======================
-//  Control LEDs (Publish)
-// =======================
-function toggleLED(ledNum) {
-  const topic = `esp32/led${ledNum}`;
-  client.publish(topic, 'toggle'); // Web sends toggle command
-  console.log(`🚀 Sent toggle command for LED ${ledNum}`);
-}
+<body>
+  <h1>ESP32 MQTT Control</h1>
+  <p>Broker: HiveMQ Public</p>
 
-// =======================
-//  Debug Connection
-// =======================
-client.on('reconnect', () => console.log('🔁 Reconnecting...'));
-client.on('close', () => console.log('❌ Disconnected from broker'));
-</script>
+  <div class="led-container">
+    <div class="card">
+      <h3>LED 1</h3>
+      <div id="led1-circle" class="circle"></div>
+      <button onclick="toggleLED(1)">Toggle</button>
+      <p id="led1-status">OFF</p>
+    </div>
+
+    <div class="card">
+      <h3>LED 2</h3>
+      <div id="led2-circle" class="circle"></div>
+      <button onclick="toggleLED(2)">Toggle</button>
+      <p id="led2-status">OFF</p>
+    </div>
+
+    <div class="card">
+      <h3>LED 3</h3>
+      <div id="led3-circle" class="circle"></div>
+      <button onclick="toggleLED(3)">Toggle</button>
+      <p id="led3-status">OFF</p>
+    </div>
+
+    <div class="card">
+      <h3>LED 4</h3>
+      <div id="led4-circle" class="circle"></div>
+      <button onclick="toggleLED(4)">Toggle</button>
+      <p id="led4-status">OFF</p>
+    </div>
+  </div>
+
+  <div id="buttons-status">
+    <h2>Buttons</h2>
+    <p>Button 1: <span id="button1-status">?</span></p>
+    <p>Button 2: <span id="button2-status">?</span></p>
+    <p>Button 3: <span id="button3-status">?</span></p>
+    <p>Button 4: <span id="button4-status">?</span></p>
+  </div>
+
+  <!-- MQTT JavaScript -->
+  <script>
+    const broker = 'wss://broker.hivemq.com:8884/mqtt';
+    const options = {
+      clean: true,
+      connectTimeout: 4000,
+      clientId: 'esp32-web-' + Math.random().toString(16).substr(2, 8),
+    };
+    const client = mqtt.connect(broker, options);
+
+    client.on('connect', () => {
+      console.log('✅ Connected to HiveMQ broker');
+      for (let i = 1; i <= 4; i++) {
+        client.subscribe(`esp32/led${i}/state`);
+        client.subscribe(`esp32/button${i}`);
+      }
+    });
+
+    client.on('message', (topic, message) => {
+      const msg = message.toString();
+      console.log('📩 Received:', topic, msg);
+
+      if (topic.includes('/led') && topic.includes('/state')) {
+        const ledNum = topic.match(/led(\d+)/)[1];
+        const status = msg === '1' ? 'ON' : 'OFF';
+        const circle = document.getElementById(`led${ledNum}-circle`);
+        const label = document.getElementById(`led${ledNum}-status`);
+        if (circle && label) {
+          circle.style.backgroundColor = status === 'ON' ? 'limegreen' : 'gray';
+          label.innerText = status;
+        }
+      }
+
+      if (topic.includes('/button')) {
+        const btnNum = topic.match(/button(\d+)/)[1];
+        const btnLabel = document.getElementById(`button${btnNum}-status`);
+        if (btnLabel) {
+          btnLabel.innerText = msg;
+        }
+      }
+    });
+
+    function toggleLED(ledNum) {
+      const topic = `esp32/led${ledNum}`;
+      client.publish(topic, 'toggle');
+      console.log(`🚀 Sent toggle command for LED ${ledNum}`);
+    }
+
+    client.on('reconnect', () => console.log('🔁 Reconnecting...'));
+    client.on('close', () => console.log('❌ Disconnected from broker'));
+  </script>
+</body>
+</html>
