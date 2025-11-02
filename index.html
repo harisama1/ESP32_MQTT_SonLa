@@ -124,16 +124,19 @@
 
   <!-- MQTT JavaScript -->
   <script>
+    // MQTT broker cấu hình
     const broker = 'wss://broker.hivemq.com:8884/mqtt';
     const options = {
       clean: true,
       connectTimeout: 4000,
       clientId: 'esp32-web-' + Math.random().toString(16).substr(2, 8),
     };
+
+    // Kết nối MQTT
     const client = mqtt.connect(broker, options);
 
-    // Lưu trạng thái hiện tại của LED
-    const ledState = [0, 0, 0, 0, 0]; // index 1..4
+    // Mảng lưu trạng thái LED hiện tại
+    const ledState = [0, 0, 0, 0, 0]; // index từ 1..4
 
     client.on('connect', () => {
       console.log('✅ Connected to HiveMQ broker');
@@ -143,38 +146,44 @@
       }
     });
 
+    // Nhận dữ liệu từ MQTT
     client.on('message', (topic, message) => {
       const msg = message.toString();
       console.log('📩 Received:', topic, msg);
 
-      // Xử lý LED state từ ESP32
+      // Nếu là trạng thái LED
       if (topic.includes('/led') && topic.includes('/state')) {
         const ledNum = topic.match(/led(\d+)/)[1];
         const status = msg === '1' ? 'ON' : 'OFF';
         updateLED(ledNum, status);
+        updateButton(ledNum, status); // 🔗 Đồng bộ nút
       }
 
-      // Xử lý Button state từ ESP32
+      // Nếu là trạng thái nút từ ESP32
       if (topic.includes('/button')) {
         const btnNum = topic.match(/button(\d+)/)[1];
-        updateButton(btnNum, msg === 'pressed' || msg === '1' ? 'ON' : 'OFF');
+        const status = msg === '1' ? 'ON' : 'OFF';
+        updateButton(btnNum, status);
+        updateLED(btnNum, status); // 🔗 Đồng bộ LED
       }
     });
 
+    // Gửi lệnh toggle từ web
     function toggleLED(ledNum) {
-      // Gửi lệnh MQTT
       const topic = `esp32/led${ledNum}`;
       client.publish(topic, 'toggle');
       console.log(`🚀 Sent toggle for LED ${ledNum}`);
 
-      // Đổi trạng thái tại chỗ (UI phản hồi ngay)
+      // Đổi trạng thái tạm thời trên giao diện
       const newState = ledState[ledNum] ? 0 : 1;
-      ledState[ledNum] = newState;
       const status = newState ? 'ON' : 'OFF';
+      ledState[ledNum] = newState;
+
       updateLED(ledNum, status);
       updateButton(ledNum, status);
     }
 
+    // Cập nhật LED hiển thị
     function updateLED(num, status) {
       const circle = document.getElementById(`led${num}-circle`);
       const label = document.getElementById(`led${num}-status`);
@@ -185,6 +194,7 @@
       }
     }
 
+    // Cập nhật nút hiển thị
     function updateButton(num, status) {
       const indicator = document.getElementById(`button${num}-indicator`);
       const label = document.getElementById(`button${num}-status`);
